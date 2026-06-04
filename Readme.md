@@ -191,12 +191,3 @@ Current coverage includes:
 - Burst ranking for relative sharpness normalization, missing scores, review-state propagation, high-confidence winners, and one-click culling eligibility
 - Histogram calculation for RGB/RGBA luminance bins, normalization by maximum bin count, and unsupported image handling
 
-## Relationship To RawCullVerify
-
-This package is not yet wired into `RawCullVerify.xcodeproj`. The intended integration path is incremental:
-
-1. Add `RawCullCore` as a local Swift package dependency.
-2. Bridge app-side `FileItem`, `ExifMetadata`, and `ARWSourceCatalog` to the package models or replace them directly where practical.
-3. Move app burst grouping/ranking calls over to `BurstGroupingEngine` and `BurstRankingEngine`.
-4. Replace the app histogram calculator with `HistogramCalculator`.
-5. Keep Metal/CoreImage/Vision focus scoring in the app unless it is split into a separate heavier image-analysis package later.
