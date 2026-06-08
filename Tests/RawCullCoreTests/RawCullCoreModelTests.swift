@@ -1,11 +1,11 @@
 import Foundation
-import Testing
 @testable import RawCullCore
+import Testing
 
 @Suite("RawCullCore models")
 struct RawCullCoreModelTests {
-    @Test("ExifMetadata is codable and hashable")
-    func exifMetadataCodableHashable() throws {
+    @Test
+    func `ExifMetadata is codable and hashable`() throws {
         let metadata = ExifMetadata(
             shutterSpeed: "1/1000",
             focalLength: "600.0mm",
@@ -28,8 +28,8 @@ struct RawCullCoreModelTests {
         #expect(Set([metadata, decoded]).count == 1)
     }
 
-    @Test("RawCullFileItem identity equality is keyed by id")
-    func fileItemIdentityEquality() {
+    @Test
+    func `RawCullFileItem identity equality is keyed by id`() {
         let id = UUID()
         let first = RawCullFileItem(
             id: id,
@@ -55,8 +55,8 @@ struct RawCullCoreModelTests {
         #expect(first.formattedSize.isEmpty == false)
     }
 
-    @Test("RawCullSourceCatalog stores source identity and URL")
-    func sourceCatalogStoresValues() {
+    @Test
+    func `RawCullSourceCatalog stores source identity and URL`() {
         let id = UUID()
         let url = URL(fileURLWithPath: "/tmp/catalog")
         let catalog = RawCullSourceCatalog(id: id, name: "Catalog", url: url)

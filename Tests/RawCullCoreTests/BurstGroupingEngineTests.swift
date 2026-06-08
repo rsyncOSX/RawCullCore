@@ -1,12 +1,12 @@
 import CoreGraphics
 import Foundation
-import Testing
 @testable import RawCullCore
+import Testing
 
 @Suite("BurstGroupingEngine")
 struct BurstGroupingEngineTests {
-    @Test("Empty file list returns no groups or evidence")
-    func emptyFileList() {
+    @Test
+    func `Empty file list returns no groups or evidence`() {
         let output = BurstGroupingEngine.group(
             files: [],
             adjacentDistances: [:],
@@ -17,8 +17,8 @@ struct BurstGroupingEngineTests {
         #expect(output.boundaryEvidence.isEmpty)
     }
 
-    @Test("Low visual distance and stable metadata keeps files in one burst")
-    func stableFilesStayInOneBurst() throws {
+    @Test
+    func `Low visual distance and stable metadata keeps files in one burst`() throws {
         let files = [
             makeBurstFile(name: "one.ARW", seconds: 0),
             makeBurstFile(name: "two.ARW", seconds: 1),
@@ -41,8 +41,8 @@ struct BurstGroupingEngineTests {
         #expect(output.boundaryEvidence.allSatisfy { !$0.startsNewGroup })
     }
 
-    @Test("Missing similarity evidence starts a new group")
-    func missingSimilarityStartsNewGroup() throws {
+    @Test
+    func `Missing similarity evidence starts a new group`() throws {
         let files = [
             makeBurstFile(name: "one.ARW", seconds: 0),
             makeBurstFile(name: "two.ARW", seconds: 1)
@@ -60,8 +60,8 @@ struct BurstGroupingEngineTests {
         #expect(evidence.reasons == ["Similarity evidence missing"])
     }
 
-    @Test("Metadata and capture changes are recorded as boundary evidence")
-    func metadataAndCaptureChangesAreRecorded() throws {
+    @Test
+    func `Metadata and capture changes are recorded as boundary evidence`() throws {
         let previous = makeBurstFile(
             name: "one.ARW",
             seconds: 0,

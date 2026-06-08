@@ -1,11 +1,11 @@
 import Foundation
-import Testing
 @testable import RawCullCore
+import Testing
 
 @Suite("BurstRankingEngine")
 struct BurstRankingEngineTests {
-    @Test("Relative sharpness is empty when spread is too small")
-    func relativeSharpnessRequiresMeaningfulSpread() {
+    @Test
+    func `Relative sharpness is empty when spread is too small`() {
         let ids = [UUID(), UUID()]
         let components = BurstRankingEngine.burstRelativeSharpnessComponents(
             fileIDs: ids,
@@ -16,8 +16,8 @@ struct BurstRankingEngineTests {
         #expect(components.isEmpty)
     }
 
-    @Test("Relative sharpness normalizes scores inside burst")
-    func relativeSharpnessNormalizesScores() throws {
+    @Test
+    func `Relative sharpness normalizes scores inside burst`() {
         let ids = [UUID(), UUID(), UUID()]
         let components = BurstRankingEngine.burstRelativeSharpnessComponents(
             fileIDs: ids,
@@ -30,8 +30,8 @@ struct BurstRankingEngineTests {
         #expect(components[ids[2]] == 1)
     }
 
-    @Test("Rank group recommends highest scoring candidate with high confidence")
-    func rankGroupHighConfidence() throws {
+    @Test
+    func `Rank group recommends highest scoring candidate with high confidence`() throws {
         let files = [
             makeBurstFile(name: "one.ARW", seconds: 0),
             makeBurstFile(name: "two.ARW", seconds: 1),
@@ -68,8 +68,8 @@ struct BurstRankingEngineTests {
         #expect(best.reasons.contains("Burst-relative sharpness measured"))
     }
 
-    @Test("Missing scores produce low confidence and sharpness cautions")
-    func missingScoresAreLowConfidence() throws {
+    @Test
+    func `Missing scores produce low confidence and sharpness cautions`() {
         let files = [
             makeBurstFile(name: "one.ARW", seconds: 0, afPoint: nil),
             makeBurstFile(name: "two.ARW", seconds: 1, afPoint: nil)
@@ -93,8 +93,8 @@ struct BurstRankingEngineTests {
         #expect(result.candidates.allSatisfy { $0.cautions.contains("AF evidence missing") })
     }
 
-    @Test("Rank applies review states by group id")
-    func rankAppliesReviewStates() throws {
+    @Test
+    func `Rank applies review states by group id`() throws {
         let files = [
             makeBurstFile(name: "one.ARW", seconds: 0),
             makeBurstFile(name: "two.ARW", seconds: 1)

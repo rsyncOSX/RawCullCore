@@ -10,7 +10,7 @@ let package = Package(
     products: [
         .library(
             name: "RawCullCore",
-            targets: ["RawCullCore"]
+            targets: ["RawCullCore"],
         )
     ],
     targets: [
@@ -20,12 +20,12 @@ let package = Package(
                 .defaultIsolation(MainActor.self),
                 .enableUpcomingFeature("InferIsolatedConformances"),
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault")
-            ]
+            ],
         ),
         .testTarget(
             name: "RawCullCoreTests",
-            dependencies: ["RawCullCore"]
+            dependencies: ["RawCullCore"],
         )
     ],
-    swiftLanguageModes: [.v6]
+    swiftLanguageModes: [.v6],
 )

@@ -122,6 +122,10 @@ public nonisolated struct BurstWinnerOverride: Codable, Equatable, Identifiable,
 
 public nonisolated enum BurstReviewState: String, Codable, Equatable, Sendable {
     case none
+    case needsReview
+    case reviewed
+    case deferred
+    // Keep existing states for cache/backward compatibility unless you migrate them.
     case algorithmReviewed
     case manualWinnerOverride
     case decisionApplied
@@ -135,6 +139,20 @@ public nonisolated enum BurstReviewState: String, Codable, Equatable, Sendable {
     public nonisolated func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawValue)
+    }
+}
+
+public extension BurstReviewState {
+    nonisolated var title: String {
+        switch self {
+        case .none: "Not reviewed"
+        case .needsReview: "Needs Review"
+        case .reviewed: "Reviewed"
+        case .deferred: "Deferred"
+        case .algorithmReviewed: "Algorithm Reviewed"
+        case .manualWinnerOverride: "Manual Winner"
+        case .decisionApplied: "Decision Applied"
+        }
     }
 }
 

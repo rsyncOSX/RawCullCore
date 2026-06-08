@@ -1,12 +1,12 @@
 import CoreGraphics
 import Foundation
-import Testing
 @testable import RawCullCore
+import Testing
 
 @Suite("HistogramCalculator")
 struct HistogramCalculatorTests {
-    @Test("Returns 256 normalized bins")
-    func returnsNormalizedBins() throws {
+    @Test
+    func `Returns 256 normalized bins`() throws {
         let image = try makeRGBAImage(
             width: 2,
             height: 2,
@@ -28,8 +28,8 @@ struct HistogramCalculatorTests {
         #expect(histogram.reduce(0, +) == 4)
     }
 
-    @Test("Normalizes repeated luminance values by maximum bin count")
-    func normalizesByMaximumBinCount() throws {
+    @Test
+    func `Normalizes repeated luminance values by maximum bin count`() throws {
         let image = try makeRGBAImage(
             width: 3,
             height: 1,
@@ -46,8 +46,8 @@ struct HistogramCalculatorTests {
         #expect(histogram[255] == 0.5)
     }
 
-    @Test("Returns zero histogram for unsupported grayscale image")
-    func unsupportedImageReturnsZeroHistogram() throws {
+    @Test
+    func `Returns zero histogram for unsupported grayscale image`() throws {
         let image = try makeGrayscaleImage(width: 1, height: 1, pixels: [255])
 
         let histogram = HistogramCalculator.normalizedLuminanceHistogram(from: image)
