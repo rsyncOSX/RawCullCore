@@ -7,6 +7,7 @@ public nonisolated struct RawCullFileItem: Codable, Hashable, Identifiable, Send
     public let name: String
     public let size: Int64
     public let dateModified: Date
+    public let captureDate: Date?
     public let exifData: ExifMetadata?
     public let afFocusNormalized: CGPoint?
 
@@ -16,6 +17,7 @@ public nonisolated struct RawCullFileItem: Codable, Hashable, Identifiable, Send
         name: String,
         size: Int64,
         dateModified: Date,
+        captureDate: Date? = nil,
         exifData: ExifMetadata?,
         afFocusNormalized: CGPoint?,
     ) {
@@ -24,12 +26,17 @@ public nonisolated struct RawCullFileItem: Codable, Hashable, Identifiable, Send
         self.name = name
         self.size = size
         self.dateModified = dateModified
+        self.captureDate = captureDate
         self.exifData = exifData
         self.afFocusNormalized = afFocusNormalized
     }
 
     public nonisolated var formattedSize: String {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+
+    public nonisolated var effectiveCaptureDate: Date {
+        captureDate ?? dateModified
     }
 
     public nonisolated func hash(into hasher: inout Hasher) {

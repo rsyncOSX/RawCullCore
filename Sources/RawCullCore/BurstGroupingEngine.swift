@@ -28,7 +28,7 @@ public nonisolated enum BurstGroupingEngine {
             let current = files[index]
             let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
             let visualDistance = adjacentDistances[key]
-            let timeGap = current.dateModified.timeIntervalSince(previous.dateModified)
+            let timeGap = current.effectiveCaptureDate.timeIntervalSince(previous.effectiveCaptureDate)
             let focalDelta = focalLengthDelta(previous: previous, current: current)
             let cameraChanged = normalized(previous.exifData?.camera) != normalized(current.exifData?.camera)
             let lensChanged = normalized(previous.exifData?.lensModel) != normalized(current.exifData?.lensModel)

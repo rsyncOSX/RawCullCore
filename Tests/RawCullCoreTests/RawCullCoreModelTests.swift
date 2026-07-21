@@ -56,6 +56,29 @@ struct RawCullCoreModelTests {
     }
 
     @Test
+    func `RawCullFileItem decodes legacy data without a capture date`() throws {
+        let id = UUID()
+        let legacyJSON = """
+        {
+          "id": "\(id.uuidString)",
+          "url": "file:///tmp/legacy.ARW",
+          "name": "legacy.ARW",
+          "size": 100,
+          "dateModified": 1000,
+          "exifData": null,
+          "afFocusNormalized": null
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+
+        let item = try decoder.decode(RawCullFileItem.self, from: Data(legacyJSON.utf8))
+
+        #expect(item.captureDate == nil)
+        #expect(item.effectiveCaptureDate == item.dateModified)
+    }
+
+    @Test
     func `RawCullSourceCatalog stores source identity and URL`() {
         let id = UUID()
         let url = URL(fileURLWithPath: "/tmp/catalog")

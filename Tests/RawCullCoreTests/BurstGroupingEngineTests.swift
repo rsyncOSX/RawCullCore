@@ -61,6 +61,51 @@ struct BurstGroupingEngineTests {
     }
 
     @Test
+    func `Capture dates take precedence over unrelated modification dates`() throws {
+        let previous = makeBurstFile(
+            name: "one.ARW",
+            seconds: 0,
+            captureSeconds: 100.25,
+        )
+        let current = makeBurstFile(
+            name: "two.ARW",
+            seconds: 30,
+            captureSeconds: 101.75,
+        )
+        let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
+
+        let output = BurstGroupingEngine.group(
+            files: [previous, current],
+            adjacentDistances: [key: 0.10],
+            config: BurstGroupingConfig(),
+        )
+
+        let evidence = try #require(output.boundaryEvidence.first)
+        #expect(output.groups.count == 1)
+        #expect(abs(try #require(evidence.timeGapSeconds) - 1.5) < 0.000_001)
+        #expect(!evidence.startsNewGroup)
+    }
+
+    @Test
+    func `Modification dates are used when capture dates are unavailable`() throws {
+        let previous = makeBurstFile(name: "one.ARW", seconds: 0)
+        let current = makeBurstFile(name: "two.ARW", seconds: 3)
+        let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
+
+        let output = BurstGroupingEngine.group(
+            files: [previous, current],
+            adjacentDistances: [key: 0.10],
+            config: BurstGroupingConfig(),
+        )
+
+        let evidence = try #require(output.boundaryEvidence.first)
+        #expect(output.groups.count == 2)
+        #expect(evidence.timeGapSeconds == 3)
+        #expect(evidence.startsNewGroup)
+        #expect(evidence.reasons.contains("Capture gap"))
+    }
+
+    @Test
     func `Metadata and capture changes are recorded as boundary evidence`() throws {
         let previous = makeBurstFile(
             name: "one.ARW",
@@ -98,6 +143,7 @@ nonisolated func makeBurstFile(
     id: UUID = UUID(),
     name: String,
     seconds: TimeInterval,
+    captureSeconds: TimeInterval? = nil,
     exif: ExifMetadata? = makeExif(),
     afPoint: CGPoint? = CGPoint(x: 0.5, y: 0.5),
 ) -> RawCullFileItem {
@@ -107,6 +153,7 @@ nonisolated func makeBurstFile(
         name: name,
         size: 100,
         dateModified: Date(timeIntervalSince1970: seconds),
+        captureDate: captureSeconds.map(Date.init(timeIntervalSince1970:)),
         exifData: exif,
         afFocusNormalized: afPoint,
     )

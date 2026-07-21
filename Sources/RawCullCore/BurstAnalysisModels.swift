@@ -17,7 +17,7 @@ public nonisolated struct BurstGroupingConfig: Codable, Equatable, Sendable {
     public var requireSimilarFocalLength: Bool
     public var maxFocalLengthDeltaMM: Double
 
-    public nonisolated static let algorithmVersion = 2
+    public nonisolated static let algorithmVersion = 3
 
     public nonisolated init(
         visualDistanceThreshold: Float = 0.25,
