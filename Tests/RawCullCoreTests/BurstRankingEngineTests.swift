@@ -33,9 +33,9 @@ struct BurstRankingEngineTests {
     @Test
     func `Rank group recommends highest scoring candidate with high confidence`() throws {
         let files = [
-            makeBurstFile(name: "one.ARW", seconds: 0),
-            makeBurstFile(name: "two.ARW", seconds: 1),
-            makeBurstFile(name: "three.ARW", seconds: 2)
+            makeBurstFile(name: "one.ARW", seconds: 0, captureSeconds: 100),
+            makeBurstFile(name: "two.ARW", seconds: 1, captureSeconds: 101),
+            makeBurstFile(name: "three.ARW", seconds: 2, captureSeconds: 102)
         ]
         let group = BurstGroup(id: 7, fileIDs: files.map(\.id))
         let evidence = stableEvidence(for: files)
@@ -113,6 +113,77 @@ struct BurstRankingEngineTests {
 
         let result = try #require(results.first)
         #expect(result.reviewState == .manualWinnerOverride)
+    }
+
+    @Test
+    func `Faster shutter receives lower motion-risk ranking evidence`() throws {
+        let fast = makeBurstFile(
+            name: "fast.ARW",
+            seconds: 0,
+            captureSeconds: 100,
+            exif: makeExif(
+                shutterSpeed: "1/1000 s",
+                exposureTimeSeconds: 1.0 / 1_000.0,
+                focalLengthMM: 400,
+            ),
+        )
+        let slow = makeBurstFile(
+            name: "slow.ARW",
+            seconds: 1,
+            captureSeconds: 101,
+            exif: makeExif(
+                shutterSpeed: "1/100 s",
+                exposureTimeSeconds: 1.0 / 100.0,
+                focalLengthMM: 400,
+            ),
+        )
+        let files = [fast, slow]
+
+        let result = BurstRankingEngine.rankGroup(
+            BurstGroup(id: 1, fileIDs: files.map(\.id)),
+            filesByID: Dictionary(uniqueKeysWithValues: files.map { ($0.id, $0) }),
+            scores: [fast.id: 0.8, slow.id: 0.8],
+            maxScore: 1,
+            saliencyInfo: [:],
+            boundaryEvidence: stableEvidence(for: files),
+        )
+
+        #expect(result.recommendedFileID == fast.id)
+        let fastCandidate = try #require(result.candidates.first { $0.fileID == fast.id })
+        let slowCandidate = try #require(result.candidates.first { $0.fileID == slow.id })
+        #expect(fastCandidate.metadataComponent > slowCandidate.metadataComponent)
+        #expect(fastCandidate.reasons.contains("Fast shutter lowers motion risk"))
+        #expect(slowCandidate.cautions.contains("Slower shutter increases motion risk"))
+    }
+
+    @Test
+    func `High ISO receives noise-risk ranking evidence`() throws {
+        let lowISO = makeBurstFile(
+            name: "low-iso.ARW",
+            seconds: 0,
+            captureSeconds: 100,
+            exif: makeExif(isoValue: 800),
+        )
+        let highISO = makeBurstFile(
+            name: "high-iso.ARW",
+            seconds: 1,
+            captureSeconds: 101,
+            exif: makeExif(isoValue: 6_400),
+        )
+        let files = [lowISO, highISO]
+
+        let result = BurstRankingEngine.rankGroup(
+            BurstGroup(id: 1, fileIDs: files.map(\.id)),
+            filesByID: Dictionary(uniqueKeysWithValues: files.map { ($0.id, $0) }),
+            scores: [lowISO.id: 0.8, highISO.id: 0.8],
+            maxScore: 1,
+            saliencyInfo: [:],
+            boundaryEvidence: stableEvidence(for: files),
+        )
+
+        #expect(result.recommendedFileID == lowISO.id)
+        let highISOCandidate = try #require(result.candidates.first { $0.fileID == highISO.id })
+        #expect(highISOCandidate.cautions.contains("High ISO increases noise risk"))
     }
 }
 

@@ -16,8 +16,13 @@ public nonisolated struct BurstGroupingConfig: Codable, Equatable, Sendable {
     public var requireSameCamera: Bool
     public var requireSimilarFocalLength: Bool
     public var maxFocalLengthDeltaMM: Double
+    public var maxFallbackTimeGapSeconds: Double
+    public var maxShutterSpeedDeltaEV: Double
+    public var maxApertureDeltaEV: Double
+    public var maxISODeltaEV: Double
+    public var maxExposureCompensationDeltaEV: Double
 
-    public nonisolated static let algorithmVersion = 3
+    public nonisolated static let algorithmVersion = 4
 
     public nonisolated init(
         visualDistanceThreshold: Float = 0.25,
@@ -25,12 +30,62 @@ public nonisolated struct BurstGroupingConfig: Codable, Equatable, Sendable {
         requireSameCamera: Bool = true,
         requireSimilarFocalLength: Bool = true,
         maxFocalLengthDeltaMM: Double = 3.0,
+        maxFallbackTimeGapSeconds: Double = 10.0,
+        maxShutterSpeedDeltaEV: Double = 0.5,
+        maxApertureDeltaEV: Double = 0.5,
+        maxISODeltaEV: Double = 0.5,
+        maxExposureCompensationDeltaEV: Double = 0.34,
     ) {
         self.visualDistanceThreshold = visualDistanceThreshold
         self.maxTimeGapSeconds = maxTimeGapSeconds
         self.requireSameCamera = requireSameCamera
         self.requireSimilarFocalLength = requireSimilarFocalLength
         self.maxFocalLengthDeltaMM = maxFocalLengthDeltaMM
+        self.maxFallbackTimeGapSeconds = maxFallbackTimeGapSeconds
+        self.maxShutterSpeedDeltaEV = maxShutterSpeedDeltaEV
+        self.maxApertureDeltaEV = maxApertureDeltaEV
+        self.maxISODeltaEV = maxISODeltaEV
+        self.maxExposureCompensationDeltaEV = maxExposureCompensationDeltaEV
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case visualDistanceThreshold
+        case maxTimeGapSeconds
+        case requireSameCamera
+        case requireSimilarFocalLength
+        case maxFocalLengthDeltaMM
+        case maxFallbackTimeGapSeconds
+        case maxShutterSpeedDeltaEV
+        case maxApertureDeltaEV
+        case maxISODeltaEV
+        case maxExposureCompensationDeltaEV
+    }
+
+    public nonisolated init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        visualDistanceThreshold = try values.decodeIfPresent(Float.self, forKey: .visualDistanceThreshold)
+            ?? defaults.visualDistanceThreshold
+        maxTimeGapSeconds = try values.decodeIfPresent(Double.self, forKey: .maxTimeGapSeconds)
+            ?? defaults.maxTimeGapSeconds
+        requireSameCamera = try values.decodeIfPresent(Bool.self, forKey: .requireSameCamera)
+            ?? defaults.requireSameCamera
+        requireSimilarFocalLength = try values.decodeIfPresent(Bool.self, forKey: .requireSimilarFocalLength)
+            ?? defaults.requireSimilarFocalLength
+        maxFocalLengthDeltaMM = try values.decodeIfPresent(Double.self, forKey: .maxFocalLengthDeltaMM)
+            ?? defaults.maxFocalLengthDeltaMM
+        maxFallbackTimeGapSeconds = try values.decodeIfPresent(Double.self, forKey: .maxFallbackTimeGapSeconds)
+            ?? defaults.maxFallbackTimeGapSeconds
+        maxShutterSpeedDeltaEV = try values.decodeIfPresent(Double.self, forKey: .maxShutterSpeedDeltaEV)
+            ?? defaults.maxShutterSpeedDeltaEV
+        maxApertureDeltaEV = try values.decodeIfPresent(Double.self, forKey: .maxApertureDeltaEV)
+            ?? defaults.maxApertureDeltaEV
+        maxISODeltaEV = try values.decodeIfPresent(Double.self, forKey: .maxISODeltaEV)
+            ?? defaults.maxISODeltaEV
+        maxExposureCompensationDeltaEV = try values.decodeIfPresent(
+            Double.self,
+            forKey: .maxExposureCompensationDeltaEV,
+        ) ?? defaults.maxExposureCompensationDeltaEV
     }
 }
 
@@ -45,7 +100,9 @@ public nonisolated struct BurstBoundaryEvidence: Codable, Equatable, Sendable {
     public var currentID: UUID
     public var visualDistance: Float?
     public var timeGapSeconds: Double?
+    public var captureTimeUsedFallback: Bool
     public var focalLengthDelta: Double?
+    public var exposureAdjustmentEV: Double?
     public var exposureChanged: Bool
     public var cameraChanged: Bool
     public var lensChanged: Bool
@@ -57,7 +114,9 @@ public nonisolated struct BurstBoundaryEvidence: Codable, Equatable, Sendable {
         currentID: UUID,
         visualDistance: Float?,
         timeGapSeconds: Double?,
+        captureTimeUsedFallback: Bool = false,
         focalLengthDelta: Double?,
+        exposureAdjustmentEV: Double? = nil,
         exposureChanged: Bool,
         cameraChanged: Bool,
         lensChanged: Bool,
@@ -68,12 +127,45 @@ public nonisolated struct BurstBoundaryEvidence: Codable, Equatable, Sendable {
         self.currentID = currentID
         self.visualDistance = visualDistance
         self.timeGapSeconds = timeGapSeconds
+        self.captureTimeUsedFallback = captureTimeUsedFallback
         self.focalLengthDelta = focalLengthDelta
+        self.exposureAdjustmentEV = exposureAdjustmentEV
         self.exposureChanged = exposureChanged
         self.cameraChanged = cameraChanged
         self.lensChanged = lensChanged
         self.startsNewGroup = startsNewGroup
         self.reasons = reasons
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case previousID
+        case currentID
+        case visualDistance
+        case timeGapSeconds
+        case captureTimeUsedFallback
+        case focalLengthDelta
+        case exposureAdjustmentEV
+        case exposureChanged
+        case cameraChanged
+        case lensChanged
+        case startsNewGroup
+        case reasons
+    }
+
+    public nonisolated init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        previousID = try values.decode(UUID.self, forKey: .previousID)
+        currentID = try values.decode(UUID.self, forKey: .currentID)
+        visualDistance = try values.decodeIfPresent(Float.self, forKey: .visualDistance)
+        timeGapSeconds = try values.decodeIfPresent(Double.self, forKey: .timeGapSeconds)
+        captureTimeUsedFallback = try values.decodeIfPresent(Bool.self, forKey: .captureTimeUsedFallback) ?? false
+        focalLengthDelta = try values.decodeIfPresent(Double.self, forKey: .focalLengthDelta)
+        exposureAdjustmentEV = try values.decodeIfPresent(Double.self, forKey: .exposureAdjustmentEV)
+        exposureChanged = try values.decode(Bool.self, forKey: .exposureChanged)
+        cameraChanged = try values.decode(Bool.self, forKey: .cameraChanged)
+        lensChanged = try values.decode(Bool.self, forKey: .lensChanged)
+        startsNewGroup = try values.decode(Bool.self, forKey: .startsNewGroup)
+        reasons = try values.decode([String].self, forKey: .reasons)
     }
 }
 

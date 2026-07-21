@@ -38,6 +38,7 @@ public nonisolated enum BurstRankingEngine {
             idSet.contains($0.previousID) && idSet.contains($0.currentID)
         }
         let metadataStable = !groupEvidence.contains { $0.exposureChanged || $0.cameraChanged || $0.lensChanged }
+        let captureTimesReliable = files.allSatisfy { !$0.usesFileModificationDateForCaptureTime }
         let tightSimilarity = groupEvidence.allSatisfy { evidence in
             guard let distance = evidence.visualDistance else { return false }
             return distance < 0.22
@@ -81,6 +82,7 @@ public nonisolated enum BurstRankingEngine {
             hasScores: hasScores,
             metadataStable: metadataStable,
             tightSimilarity: tightSimilarity,
+            captureTimesReliable: captureTimesReliable,
         )
         candidates = candidates.map { item in
             var updated = item
@@ -89,7 +91,14 @@ public nonisolated enum BurstRankingEngine {
         }
 
         let reasons = resultReasons(best: best, second: second, metadataStable: metadataStable, tightSimilarity: tightSimilarity)
-        let cautions = resultCautions(best: best, second: second, hasScores: hasScores, metadataStable: metadataStable, tightSimilarity: tightSimilarity)
+        let cautions = resultCautions(
+            best: best,
+            second: second,
+            hasScores: hasScores,
+            metadataStable: metadataStable,
+            tightSimilarity: tightSimilarity,
+            captureTimesReliable: captureTimesReliable,
+        )
 
         return BurstAnalysisResult(
             groupID: group.id,
@@ -146,6 +155,17 @@ public nonisolated enum BurstRankingEngine {
         }
         if !metadataStable {
             cautions.append("Metadata changed")
+        }
+        switch motionRisk(for: file) {
+        case .lower:
+            reasons.append("Fast shutter lowers motion risk")
+        case .elevated:
+            cautions.append("Slower shutter increases motion risk")
+        case .unknown:
+            break
+        }
+        if let iso = file.exifData?.isoValue, iso >= 3_200 {
+            cautions.append("High ISO increases noise risk")
         }
 
         return BurstCandidateScore(
@@ -207,9 +227,48 @@ public nonisolated enum BurstRankingEngine {
     ) -> Float {
         var value: Float = metadataStable ? 0.70 : 0.40
         if tightSimilarity { value += 0.15 }
-        if let iso = file.exifData?.isoValue, iso >= 6400 { value -= 0.10 }
+        if let iso = file.exifData?.isoValue, iso > 1_600 {
+            let stops = log2(Double(iso) / 1_600)
+            value -= min(Float(stops) * 0.05, 0.15)
+        }
         if let aperture = file.exifData?.apertureValue, aperture <= 5.6 { value += 0.05 }
+        switch motionRisk(for: file) {
+        case .lower:
+            value += 0.05
+        case let .elevated(stops):
+            value -= min(Float(stops) * 0.05, 0.15)
+        case .unknown:
+            break
+        }
         return min(max(value, 0), 1)
+    }
+
+    private nonisolated enum MotionRisk {
+        case lower
+        case elevated(stops: Double)
+        case unknown
+    }
+
+    private nonisolated static func motionRisk(for file: RawCullFileItem) -> MotionRisk {
+        guard let exposureTime = file.exifData?.exposureTimeSeconds,
+              exposureTime.isFinite,
+              exposureTime > 0
+        else { return .unknown }
+
+        if let focalLength = file.exifData?.focalLengthMM,
+           focalLength.isFinite,
+           focalLength > 0 {
+            let reciprocalRatio = exposureTime * focalLength
+            if reciprocalRatio <= 0.5 { return .lower }
+            if reciprocalRatio > 1 { return .elevated(stops: log2(reciprocalRatio)) }
+            return .unknown
+        }
+
+        if exposureTime <= 1.0 / 500.0 { return .lower }
+        if exposureTime >= 1.0 / 60.0 {
+            return .elevated(stops: log2(exposureTime / (1.0 / 60.0)) + 1)
+        }
+        return .unknown
     }
 
     private nonisolated static func dominantSubject(
@@ -230,6 +289,7 @@ public nonisolated enum BurstRankingEngine {
         hasScores: Bool,
         metadataStable: Bool,
         tightSimilarity: Bool,
+        captureTimesReliable: Bool,
     ) -> BurstDecisionConfidence {
         guard hasScores, let best else { return .low }
         let gap = best.overallScore - (second?.overallScore ?? 0)
@@ -237,7 +297,8 @@ public nonisolated enum BurstRankingEngine {
            gap >= 0.12,
            best.sharpnessComponent >= 0.65,
            metadataStable,
-           tightSimilarity {
+           tightSimilarity,
+           captureTimesReliable {
             return .high
         }
         if gap >= 0.05, metadataStable {
@@ -274,6 +335,7 @@ public nonisolated enum BurstRankingEngine {
         hasScores: Bool,
         metadataStable: Bool,
         tightSimilarity: Bool,
+        captureTimesReliable: Bool,
     ) -> [String] {
         var cautions: [String] = []
         if !hasScores {
@@ -284,6 +346,9 @@ public nonisolated enum BurstRankingEngine {
         }
         if !tightSimilarity {
             cautions.append("Similarity spread is wider")
+        }
+        if !captureTimesReliable {
+            cautions.append("Capture time uses file-date fallback")
         }
         if let best, let second, best.overallScore - second.overallScore < 0.05 {
             cautions.append("Top two are close")

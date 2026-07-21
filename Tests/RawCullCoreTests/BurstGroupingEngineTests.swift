@@ -89,7 +89,7 @@ struct BurstGroupingEngineTests {
     @Test
     func `Modification dates are used when capture dates are unavailable`() throws {
         let previous = makeBurstFile(name: "one.ARW", seconds: 0)
-        let current = makeBurstFile(name: "two.ARW", seconds: 3)
+        let current = makeBurstFile(name: "two.ARW", seconds: 30)
         let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
 
         let output = BurstGroupingEngine.group(
@@ -100,9 +100,105 @@ struct BurstGroupingEngineTests {
 
         let evidence = try #require(output.boundaryEvidence.first)
         #expect(output.groups.count == 2)
-        #expect(evidence.timeGapSeconds == 3)
+        #expect(evidence.timeGapSeconds == 30)
+        #expect(evidence.captureTimeUsedFallback)
         #expect(evidence.startsNewGroup)
         #expect(evidence.reasons.contains("Capture gap"))
+    }
+
+    @Test
+    func `File-date fallback uses a wider lower-confidence time tolerance`() throws {
+        let previous = makeBurstFile(name: "one.ARW", seconds: 0)
+        let current = makeBurstFile(name: "two.ARW", seconds: 3)
+        let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
+
+        let output = BurstGroupingEngine.group(
+            files: [previous, current],
+            adjacentDistances: [key: 0.10],
+            config: BurstGroupingConfig(),
+        )
+
+        let evidence = try #require(output.boundaryEvidence.first)
+        #expect(output.groups.count == 1)
+        #expect(evidence.captureTimeUsedFallback)
+        #expect(!evidence.startsNewGroup)
+    }
+
+    @Test
+    func `Small numeric auto-exposure adjustments do not split a burst`() throws {
+        let previous = makeBurstFile(
+            name: "one.ARW",
+            seconds: 0,
+            captureSeconds: 100,
+            exif: makeExif(
+                shutterSpeed: "1/1000 s",
+                exposureTimeSeconds: 1.0 / 1_000.0,
+                apertureValue: 5.6,
+                isoValue: 800,
+                exposureCompensationEV: 0,
+            ),
+        )
+        let current = makeBurstFile(
+            name: "two.ARW",
+            seconds: 1,
+            captureSeconds: 101,
+            exif: makeExif(
+                shutterSpeed: "1/1250 s",
+                exposureTimeSeconds: 1.0 / 1_250.0,
+                apertureValue: 6.3,
+                isoValue: 1_000,
+                exposureCompensationEV: -0.3,
+            ),
+        )
+        let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
+
+        let output = BurstGroupingEngine.group(
+            files: [previous, current],
+            adjacentDistances: [key: 0.10],
+            config: BurstGroupingConfig(),
+        )
+
+        let evidence = try #require(output.boundaryEvidence.first)
+        #expect(output.groups.count == 1)
+        #expect(!evidence.exposureChanged)
+        #expect(try #require(evidence.exposureAdjustmentEV) > 0.3)
+        #expect(!evidence.startsNewGroup)
+    }
+
+    @Test
+    func `Large numeric exposure adjustments split a burst`() throws {
+        let previous = makeBurstFile(
+            name: "one.ARW",
+            seconds: 0,
+            captureSeconds: 100,
+            exif: makeExif(
+                exposureTimeSeconds: 1.0 / 1_000.0,
+                exposureCompensationEV: 0,
+            ),
+        )
+        let current = makeBurstFile(
+            name: "two.ARW",
+            seconds: 1,
+            captureSeconds: 101,
+            exif: makeExif(
+                shutterSpeed: "1/2000 s",
+                exposureTimeSeconds: 1.0 / 2_000.0,
+                exposureCompensationEV: -1,
+            ),
+        )
+        let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
+
+        let output = BurstGroupingEngine.group(
+            files: [previous, current],
+            adjacentDistances: [key: 0.10],
+            config: BurstGroupingConfig(),
+        )
+
+        let evidence = try #require(output.boundaryEvidence.first)
+        #expect(output.groups.count == 2)
+        #expect(evidence.exposureChanged)
+        #expect(evidence.exposureAdjustmentEV == 1)
+        #expect(evidence.reasons.contains("Exposure changed"))
     }
 
     @Test
@@ -110,11 +206,13 @@ struct BurstGroupingEngineTests {
         let previous = makeBurstFile(
             name: "one.ARW",
             seconds: 0,
+            captureSeconds: 100,
             exif: makeExif(shutterSpeed: "1/1000", focalLength: "400.0mm", apertureValue: 5.6, isoValue: 800, camera: "A", lens: "L"),
         )
         let current = makeBurstFile(
             name: "two.ARW",
             seconds: 5,
+            captureSeconds: 105,
             exif: makeExif(shutterSpeed: "1/2000", focalLength: "500.0mm", apertureValue: 8.0, isoValue: 1600, camera: "B", lens: "L"),
         )
         let key = BurstPairKey.cacheKey(previousID: previous.id, currentID: current.id)
@@ -161,19 +259,25 @@ nonisolated func makeBurstFile(
 
 nonisolated func makeExif(
     shutterSpeed: String? = "1/1000",
+    exposureTimeSeconds: Double? = nil,
     focalLength: String? = "400.0mm",
+    focalLengthMM: Double? = nil,
     apertureValue: Double? = 5.6,
     isoValue: Int? = 800,
+    exposureCompensationEV: Double? = nil,
     camera: String? = "ILCE-1",
     lens: String? = "FE 400mm",
 ) -> ExifMetadata {
     ExifMetadata(
         shutterSpeed: shutterSpeed,
+        exposureTimeSeconds: exposureTimeSeconds,
         focalLength: focalLength,
+        focalLengthMM: focalLengthMM,
         aperture: apertureValue.map { "ƒ/\($0)" },
         apertureValue: apertureValue,
         iso: isoValue.map { "ISO \($0)" },
         isoValue: isoValue,
+        exposureCompensationEV: exposureCompensationEV,
         camera: camera,
         lensModel: lens,
         rawFileType: "Lossless Compressed",

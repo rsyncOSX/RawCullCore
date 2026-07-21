@@ -8,11 +8,14 @@ struct RawCullCoreModelTests {
     func `ExifMetadata is codable and hashable`() throws {
         let metadata = ExifMetadata(
             shutterSpeed: "1/1000",
+            exposureTimeSeconds: 0.001,
             focalLength: "600.0mm",
+            focalLengthMM: 600,
             aperture: "ƒ/5.6",
             apertureValue: 5.6,
             iso: "ISO 800",
             isoValue: 800,
+            exposureCompensationEV: -0.3,
             camera: "ILCE-1",
             lensModel: "FE 600mm F4 GM OSS",
             rawFileType: "Lossless Compressed",
@@ -37,6 +40,8 @@ struct RawCullCoreModelTests {
             name: "one.ARW",
             size: 100,
             dateModified: Date(timeIntervalSince1970: 1),
+            captureDate: Date(timeIntervalSince1970: 0.5),
+            captureTimeZoneOffsetSeconds: 7_200,
             exifData: nil,
             afFocusNormalized: nil,
         )
@@ -75,7 +80,29 @@ struct RawCullCoreModelTests {
         let item = try decoder.decode(RawCullFileItem.self, from: Data(legacyJSON.utf8))
 
         #expect(item.captureDate == nil)
+        #expect(item.captureTimeZoneOffsetSeconds == nil)
         #expect(item.effectiveCaptureDate == item.dateModified)
+        #expect(item.usesFileModificationDateForCaptureTime)
+    }
+
+    @Test
+    func `Legacy grouping config decodes new tolerance defaults`() throws {
+        let legacyJSON = """
+        {
+          "visualDistanceThreshold": 0.2,
+          "maxTimeGapSeconds": 2,
+          "requireSameCamera": true,
+          "requireSimilarFocalLength": true,
+          "maxFocalLengthDeltaMM": 3
+        }
+        """
+
+        let config = try JSONDecoder().decode(BurstGroupingConfig.self, from: Data(legacyJSON.utf8))
+
+        #expect(config.visualDistanceThreshold == 0.2)
+        #expect(config.maxFallbackTimeGapSeconds == 10)
+        #expect(config.maxShutterSpeedDeltaEV == 0.5)
+        #expect(config.maxExposureCompensationDeltaEV == 0.34)
     }
 
     @Test
