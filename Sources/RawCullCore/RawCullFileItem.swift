@@ -46,6 +46,16 @@ public nonisolated struct RawCullFileItem: Codable, Hashable, Identifiable, Send
         captureDate == nil
     }
 
+    // Identity: `==` and `hash(into:)` compare `id` only. That is correct only
+    // while two items with the same `id` always carry the same metadata, which
+    // holds today because every scan creates a fresh `UUID` (`ScanFiles`) and
+    // all stored properties are `let`.
+    //
+    // Keep it that way: do not add mutable, analysis or UI state here. Store
+    // per-photo state separately, keyed by `id`. If items are ever rebuilt
+    // or decoded with an existing `id` but new metadata, compare all fields in
+    // `==` and use `id` only for `Identifiable`; otherwise SwiftUI
+    // `onChange(of:)` and set-based diffing will miss the change.
     public nonisolated func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
